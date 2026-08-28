@@ -218,6 +218,8 @@ const sceneGroups: (string | SceneGroup)[] = [
     Scenes_HalfLife2.sceneGroup,
     Scenes_HalfLife2DM.sceneGroup,
     Scenes_Halo1.sceneGroup,
+    Scenes_Incoming.sceneGroup,
+    Scenes_Incoming.subversionSceneGroup,
     Scenes_NfsMostWanted.sceneGroup,
     Scenes_TeamFortress2.sceneGroup,
     Scenes_Portal.sceneGroup,
@@ -280,7 +282,6 @@ const sceneGroups: (string | SceneGroup)[] = [
     Scenes_Descent2.sceneGroup,
     Scenes_Descent2Vertigo.sceneGroup,
     Scenes_TokyoMirageSessionsSharpFE.sceneGroup,
-    Scenes_Incoming.sceneGroup,
     Scenes_TopGearRally.sceneGroup,
     Scenes_KingdomHeartsBBS.sceneGroup,
 ];
