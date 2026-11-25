@@ -1,7 +1,7 @@
 
 // Parser for Incoming (1998, Rage Software) ".odl" object-definition files.
 
-// Stands in for the engine's continuous radar sweep, which has no authored rate.
+// Replaces the continuous radar sweep of the engine. The sweep has no authored rate.
 const BRADAR_YAW_RATE = 0.3;
 
 /** Render flags for an object type, OR'd from `drawtype` and the inline render-flag keywords. */
@@ -18,7 +18,7 @@ export const enum IncomingMaterialFlag {
 
 /** Texture attributes from a `texture "path" <flags...>` declaration. */
 export const enum IncomingTextureFlag {
-    /** `transparent`, 1-bit color-key: key-colored pixels are skipped. */
+    /** `transparent`, 1-bit color-key. Key-colored pixels are skipped. */
     ColorKey = 0x01,
     /** `alpha`, fully alpha-blended. */
     Alpha = 0x02,
@@ -28,13 +28,13 @@ export const enum IncomingTextureFlag {
     AlphaInverse = 0x08,
 }
 
-/** A light on a part, in that part's local model space. */
+/** A light on a part, in the local model space of the part. */
 export interface IncomingLight {
     /** `lamp` and `point` are omni, `spot` is a cone. */
     readonly kind: "lamp" | "point" | "spot";
-    /** Local-space position relative to the owning part. */
+    /** Local-space position relative to the part. */
     readonly position: [number, number, number];
-    /** RGB. Values may exceed 255, since lights are summed and then clamped. */
+    /** RGB. Values may exceed 255. Lights are summed and then clamped. */
     readonly color: [number, number, number];
     /** Range in world units: lamp `radius`, point `range`. */
     readonly radius: number;
@@ -57,7 +57,7 @@ export interface IncomingSprite {
     readonly size: number;
     /** Base RGB 0..255, `colour 1=R G B`, engine default 128,128,128. */
     readonly color: [number, number, number];
-    /** RGB keyframes from a `colourfade` block. Empty when the sprite holds a static colour. */
+    /** RGB keyframes from a `colourfade` block. Empty when the sprite has a static colour. */
     cycleColors: [number, number, number][];
     /** Cycle rate from `colourfade speed N`, engine default 8. Zero for a static colour. */
     cycleSpeed: number;
@@ -73,9 +73,9 @@ export interface IncomingProcGeom {
     readonly width: number;
     /** Latitude segments, `height=`. */
     readonly height: number;
-    /** Texture tiling around the longitude: the hemisphere's first `repeat=` value, else 1. */
+    /** Texture tiling around the longitude, from the first hemisphere `repeat=` value, else 1. */
     readonly repeatU: number;
-    /** Texture tiling along the latitude: the hemisphere's second `repeat=` value, else 1. */
+    /** Texture tiling along the latitude, from the second hemisphere `repeat=` value, else 1. */
     readonly repeatV: number;
 }
 
@@ -94,7 +94,7 @@ export interface IncomingSmoke {
     /** Peak puff opacity 0..255, `alpha A`, engine default 128. Ignored when {@link additive}. */
     readonly alpha: number;
     /**
-     * Frames between puff spawns, `rate N`, engine default 4. Puffs alive at once come to
+     * Frames between puff spawns, `rate N`, engine default 4. The concurrent puff count is
      * `ceil(lifetime / rate)`.
      */
     readonly rate: number;
@@ -104,14 +104,14 @@ export interface IncomingSmoke {
      */
     readonly lifetime: number;
     /**
-     * True when `frames` was authored negative, which makes the engine blend the puffs additively.
+     * True when `frames` was authored negative. The engine then blends the puffs additively.
      * Chimney and exhaust trails are additive; the cooling tower is not.
      */
     readonly additive: boolean;
 }
 
 /**
- * One node of an object type's part hierarchy: a mesh with its own material and a local pose
+ * One node of the part hierarchy of an object type, a mesh with a material and a local pose
  * relative to its parent. `parts[0]` is the root, and `child` and `sibling` directives append the
  * rest. Non-visual directives such as dynamics, cannons and sound are parsed and discarded.
  */
@@ -141,9 +141,9 @@ export interface IncomingPart {
     /** Never backface-cull this part's triangles, from the `double sided` face flag. */
     doubleSided: boolean;
     /**
-     * Negate the mesh along an axis, from `drawtype flipx`, `flipy` and `flipz`, which are engine
-     * face flags 0x02, 0x04 and 0x08. This builds a mirrored variant from a shared mesh: the
-     * `cobra` is a `flipx flipz`, so a 180-degree yaw, of another helicopter.
+     * Negate the mesh along an axis, from `drawtype flipx`, `flipy` and `flipz` (engine face flags
+     * 0x02, 0x04 and 0x08). This builds a mirrored variant from a shared mesh. For example, the
+     * `cobra` is another helicopter with `flipx flipz`, equivalent to a 180-degree yaw.
      */
     flipX: boolean;
     flipY: boolean;
@@ -155,16 +155,16 @@ export interface IncomingPart {
     /** Up orientation vector, relative to the parent part. */
     up: [number, number, number];
     /**
-     * Per-axis spin in radians per engine tick, from `operate "spin" ax ay az`, about the part's
-     * own local axes.
+     * Per-axis spin in radians per engine tick, from `operate "spin" ax ay az`, about the local
+     * axes of the part.
      */
     spin?: [number, number, number];
     /**
-     * Apply {@link spin} to this part's descendants but not its own mesh. Set for
+     * Apply {@link spin} to the descendants of this part but not to its mesh. Set for
      * `operate "bradar"`, a radar relay. The engine sweeps the whole object, but the structural base
-     * is radially symmetric at the game's texture resolution, so its rotation never shows there. At
-     * noclip's fidelity the base visibly and wrongly spins, so only the dish child turns.
-     * `operate "spin"`, for rotors and rings, leaves this false and spins the part's own mesh.
+     * is radially symmetric at the texture resolution of the game, hiding its rotation. At noclip
+     * fidelity the spinning base is visible, and only the dish child turns here. `operate "spin"`,
+     * for rotors and rings, sets this false and spins the mesh of the part.
      */
     spinInheritOnly: boolean;
     /**
@@ -206,13 +206,12 @@ export interface IncomingObjectType {
     readonly parts: IncomingPart[];
     /**
      * Path under `ppm/` to the type-wide ground-shadow silhouette, from the `shadow` directive.
-     * Captured only; shadow rendering is not implemented.
      */
     shadowTexture?: string;
     /**
      * Maximum velocity in world units per engine tick, from the `dynamics` block's `max vel N`.
-     * Used as the constant traversal speed for an actor following an MDL waypoint path: jets are
-     * about 80, transport helicopters 42, hovercraft 25, big ships 20.
+     * Used as the constant traversal speed for an object following an MDL waypoint path (jets
+     * about 80, transport helicopters 42, hovercraft 25, big ships 20).
      */
     maxVel?: number;
 }
@@ -246,8 +245,8 @@ export interface IncomingSky {
     /** World-space sun direction, from `from`. */
     lightDir: number[];
     /**
-     * True when the `from` line ends in `not_unit`, which stops the engine normalizing the light
-     * vector, so its magnitude of roughly 2 scales the directional term.
+     * True when the `from` line ends in `not_unit`. The engine then skips normalizing the light
+     * vector, and its magnitude of roughly 2 scales the directional term.
      */
     lightUnnormalized: boolean;
     /** Path under `ppm/` to the sun sprite, from `sunimage`. */
@@ -403,8 +402,8 @@ interface TypeParseState {
 }
 
 /**
- * Parses an `.odl` file body. `include` directives are collected rather than resolved, since
- * loading files is asynchronous and the caller owns it.
+ * Parses an `.odl` file body. `include` directives are collected for the caller to load
+ * asynchronously.
  *
  * @param text Full text of the file.
  * @returns The decoded object-definition data.
@@ -497,7 +496,7 @@ function parseTypeLine(kw: string, tokens: string[], state: TypeParseState): voi
     } else if (state.block === "animate") {
         // Each line poses a named sub-part as `"PART" position … [forward …] [up …]`, `wait`
         // separates keyframes and `end` closes the block. The engine plays the sequence through; we
-        // keep the last pose as a target and oscillate to it.
+        // retain the last pose as a target and oscillate to it.
         if (kw === "end") {
             state.block = undefined;
         } else if (kw !== "wait") {
@@ -546,7 +545,7 @@ function parseTypeLine(kw: string, tokens: string[], state: TypeParseState): voi
         return;
     }
     if (kw === "parent") {
-        // Type-wide attributes follow, so return to the root. The engine special-cases `parent` as
+        // Type-wide attributes follow. Return to the root. The engine special-cases `parent` as
         // a block terminator before its sub-command table lookup.
         state.cur = 0;
         return;
@@ -556,7 +555,7 @@ function parseTypeLine(kw: string, tokens: string[], state: TypeParseState): voi
     if (kw === "objfile") {
         const objfileArg = tokens.length >= 2 ? tokens[1].toLowerCase() : "";
         if (objfileArg === "lod") {
-            // Only the highest detail is kept, so drop the LOD variants.
+            // Drop the LOD variants and retain only the highest detail.
         } else if (objfileArg === "as") {
             // Aliases another part's mesh, resolved by the consumer.
             if (tokens.length >= 3) {
@@ -591,7 +590,7 @@ function parseTypeLine(kw: string, tokens: string[], state: TypeParseState): voi
     } else if (kw === "forward") {
         applyOrientationTokens(tokens, part);
     } else if (kw === "operate") {
-        // `bradar` takes no arguments: the engine integrates and renormalizes a direction vector
+        // `bradar` takes no arguments. The engine integrates and renormalizes a direction vector
         // each frame, giving a continuous sweep. See IncomingPart.spinInheritOnly for why only the
         // children turn here.
         const operation = tokens.length >= 2 ? tokens[1].toLowerCase() : "";
@@ -617,8 +616,8 @@ function parseTypeLine(kw: string, tokens: string[], state: TypeParseState): voi
         });
     } else if (kw === "pointlight" || kw === "spotlight") {
         // pointlight is `range falloff intensity [colours]`, spotlight `inner outer angle
-        // [colours]`. Both become an omni at the part origin taking the first operand as range,
-        // which approximates the spot cone.
+        // [colours]`. Both become an omni at the part origin with the first operand as range, an
+        // approximation of the spot cone.
         const operands = tokens.slice(1).map((t) => parseFloat(t)).filter((n) => Number.isFinite(n));
         part.lights.push({
             kind: kw === "spotlight" ? "spot" : "point",
@@ -627,7 +626,7 @@ function parseTypeLine(kw: string, tokens: string[], state: TypeParseState): voi
             radius: operands.length > 0 ? operands[0] : 1500,
         });
     } else if (kw === "name") {
-        // Captured separately rather than overwriting IncomingPart.name, which meshes resolve by.
+        // Captured separately from IncomingPart.name, the key for mesh resolution.
         if (tokens.length >= 2) {
             part.displayName = tokens[1];
         }
@@ -642,7 +641,7 @@ function parseTypeLine(kw: string, tokens: string[], state: TypeParseState): voi
         state.block = "animate";
     } else if (kw === "sprite") {
         // sprite u=U v=V w=W h=H size=S colour 1=R G B. The UV rect is in texture pixels, and the
-        // first colour operand carries an `N=` slot prefix to strip.
+        // first colour operand has an `N=` slot prefix to strip.
         const numberFor = (prefix: string): number => {
             const token = tokens.find((t) => t.toLowerCase().startsWith(prefix));
             return token !== undefined ? floatOrZero(token.slice(prefix.length)) : NaN;
@@ -661,14 +660,14 @@ function parseTypeLine(kw: string, tokens: string[], state: TypeParseState): voi
             color, cycleColors: [], cycleSpeed: 0,
         };
     } else if (kw === "colourfade") {
-        // colourfade speed N, then `colour R G B` lines holding the keyframes.
+        // colourfade speed N, then `colour R G B` lines with the keyframes.
         const speedIdx = tokens.findIndex((t) => t.toLowerCase() === "speed");
         if (part.sprite !== undefined && speedIdx >= 0) {
             part.sprite.cycleSpeed = floatOrZero(tokens[speedIdx + 1]);
         }
         state.block = "colourcycle";
     } else if (kw === "dynamics") {
-        // dynamics "class", then attribute lines. Only `max vel` is kept.
+        // dynamics "class", then attribute lines. Only `max vel` is retained.
         state.block = "dynamics";
     } else if (kw === "shadow") {
         // shadow "tex" [flags]
@@ -715,7 +714,7 @@ function parseTypeLine(kw: string, tokens: string[], state: TypeParseState): voi
             additive: signedFrames < 0,
         };
     } else if (kw === "double" || kw === "self" || kw === "semi" || kw === "reflective" || kw === "semiinv") {
-        // The same render flags can appear bare on their own line instead of after `drawtype`.
+        // The same render flags can appear bare on a separate line instead of after `drawtype`.
         parseRenderFlags(tokens, part);
     }
 }

@@ -36,8 +36,8 @@ export interface IANModel {
     readonly indices: Uint32Array;
     /**
      * Length of the leading single-sided run of {@link indices}. The remainder are faces the model
-     * marks two-sided, which the renderer must draw without back-face culling: they are the thin
-     * lattice and panel geometry that would otherwise show holes.
+     * marks two-sided (thin lattice and panel geometry), drawn without back-face culling to avoid
+     * holes.
      */
     readonly singleSidedIndexCount: number;
 }
@@ -66,7 +66,7 @@ export function parseIAN(buffer: ArrayBufferSlice): IANModel {
     }
 
     // Group the single-sided faces ahead of the two-sided ones so the renderer can draw each run
-    // with its own cull mode.
+    // with a separate cull mode.
     const indices = new Uint32Array(triangleCount * VERTICES_PER_FACE);
     let writeAt = 0;
     let singleSidedIndexCount = 0;

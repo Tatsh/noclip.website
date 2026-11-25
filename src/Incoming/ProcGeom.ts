@@ -53,8 +53,7 @@ export function buildSphereMesh(radius: number, width: number, height: number): 
 }
 
 /**
- * Dome centered on the origin. Its apex points at +Y, matching the `.ian` up convention, so it
- * stands upright when placed.
+ * Dome centered on the origin. Its apex points at +Y, matching the `.ian` up convention.
  *
  * @param radius `rad=`.
  * @param width Longitude segments, `width=`.

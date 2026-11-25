@@ -8,11 +8,11 @@ export interface IncomingMDLRef {
     /** The referenced object's `label`, resolved against the level's WDL and MDL placements. */
     readonly label: string;
     readonly mode: "world" | "local" | "localxz";
-    /** Offset X, in the frame named by {@link mode}. */
+    /** Offset X, in the frame selected by {@link mode}. */
     readonly dx: number;
-    /** Offset Y, in the frame named by {@link mode}. */
+    /** Offset Y, in the frame selected by {@link mode}. */
     readonly dy: number;
-    /** Offset Z, in the frame named by {@link mode}. */
+    /** Offset Z, in the frame selected by {@link mode}. */
     readonly dz: number;
     /** Sample terrain height for Y at the resolved (x, z), from an `on ground` reference. */
     readonly onGround: boolean;
@@ -30,7 +30,7 @@ export interface IncomingMDLAbs {
     readonly onGround: boolean;
 }
 
-/** One waypoint of a moving actor's path, from `goto X Y Z …` or a `patrol`'s `point X Y Z …`. */
+/** One waypoint of a moving object path, from `goto X Y Z …` or a `patrol`'s `point X Y Z …`. */
 export interface IncomingMDLWaypoint {
     /** Absolute waypoint, present unless {@link ref} is. */
     readonly abs?: IncomingMDLAbs;
@@ -38,7 +38,7 @@ export interface IncomingMDLWaypoint {
     readonly ref?: IncomingMDLRef;
 }
 
-/** A moving actor's traversal path, from its inline `task` or `patrol`. */
+/** A moving object's traversal path, from its inline `task` or `patrol`. */
 export interface IncomingMDLPath {
     /** Ordered waypoints. Motion needs two or more distinct points, counting the start position. */
     readonly waypoints: IncomingMDLWaypoint[];
@@ -47,9 +47,9 @@ export interface IncomingMDLPath {
 }
 
 /**
- * One `create` placement. A positionable actor carries exactly one of {@link abs} or {@link ref};
- * both are absent for dynamic spawns (`position at generation point`) and for actors whose position
- * did not parse.
+ * One `create` placement. A positionable object has exactly one of {@link abs} or {@link ref};
+ * both are absent for dynamic spawns (`position at generation point`) and for objects whose
+ * position did not parse.
  */
 export interface IncomingMDLPlacement {
     /** Object type to instance, matching an `IncomingObjectType.name`. */
@@ -66,7 +66,7 @@ export interface IncomingMDLPlacement {
     readonly abs?: IncomingMDLAbs;
     /** Reference-relative position. */
     readonly ref?: IncomingMDLRef;
-    /** Movement path from the inline `task` or `patrol`. Absent for a static actor. */
+    /** Movement path from the inline `task` or `patrol`. Absent for a static object. */
     readonly path?: IncomingMDLPath;
 }
 
@@ -90,7 +90,7 @@ function newBuildState(tokens: string[]): MDLBuildState {
 
 function parsePositionSpec(tokens: string[]): IncomingMDLWaypoint | undefined {
     const lower = tokens.map((t) => t.toLowerCase());
-    // `position at generation point` spawns dynamically and has nothing to place.
+    // `position at generation point` spawns dynamically and has no fixed position.
     if (lower[1] === "at") {
         return undefined;
     }
@@ -134,7 +134,7 @@ function parsePositionLine(tokens: string[], state: MDLBuildState): void {
 
 /**
  * Parses an `.mdl` mission file. Mission-only directives are ignored, as are `set_task` and
- * `switch_hero` paths, which are mission-gated rather than applied at first load.
+ * `switch_hero` paths (triggered during the mission rather than applied at first load).
  *
  * Callers must apply the ODL `offset`, sample terrain for `on ground`, and resolve
  * {@link IncomingMDLPlacement.ref} against the level's labeled placements.
@@ -171,8 +171,8 @@ export function parseMDL(text: string): IncomingMDLPlacement[] {
             continue;
         }
         const kw = tokens[0].toLowerCase();
-        // `set_task` blocks sit at the top level between creates, so movement and task-structure
-        // keywords have to be handled whether or not a `create` is open.
+        // `set_task` blocks sit at the top level between creates. Movement and task-structure
+        // keywords are therefore handled whether or not a `create` is open.
         if (kw === "create" || kw === "createstatic") {
             closeSetTask();
             flush();
@@ -215,7 +215,7 @@ export function parseMDL(text: string): IncomingMDLPlacement[] {
                 }
             }
         } else if (kw === "fixed_to") {
-            // `fixed_to "label" at X Y Z` attaches rigidly, offset in the label's own frame.
+            // `fixed_to "label" at X Y Z` attaches rigidly, offset in the labeled frame.
             const atIdx = tokens.findIndex((t) => t.toLowerCase() === "at");
             if (!state.posSpecified && tokens.length >= 2 && atIdx >= 0) {
                 state.posSpecified = true;

@@ -5,7 +5,7 @@
 export interface IncomingPlacement {
     /** Object type to instance, matching an `IncomingObjectType.name`. */
     readonly typeName: string;
-    /** The instance's `label "x"`, which `.mdl` placements position themselves against. */
+    /** The `label "x"` of the instance, the anchor for reference-relative `.mdl` placements. */
     readonly label?: string;
     /** World X. */
     readonly x: number;
@@ -41,7 +41,7 @@ export function stripComment(line: string): string {
 }
 
 /**
- * Splits a line on whitespace, keeping a double-quoted span as one token.
+ * Splits a line on whitespace, treating a double-quoted span as one token.
  *
  * @param line Comment-stripped line.
  * @returns The tokens.

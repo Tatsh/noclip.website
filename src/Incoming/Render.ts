@@ -40,7 +40,7 @@ const SKY_DOME_RADIUS = 1000;
 const ANIMATION_SPEED = 0.25;
 /**
  * Engine ticks per millisecond, scaled by {@link ANIMATION_SPEED}. `operate "spin"` rates are per
- * engine tick, which the original game advanced once per frame at roughly 30 fps.
+ * engine tick. The original game advanced one tick per frame at roughly 30 fps.
  */
 export const SPIN_TICKS_PER_MS = (30 / 1000) * ANIMATION_SPEED;
 const ANIM_FRAME_MS = 80 / ANIMATION_SPEED;
@@ -127,9 +127,9 @@ void main() {
     if (u_MaterialParams.x > 0.5) {
         t_Light = vec3(1.0);
     } else {
-        // Match the engine: ambient + directColor * dot(N, L), with L deliberately left
-        // un-normalized, then each point light's (rangeSq - distSq)/rangeSq * max(dot(N, toLight),
-        // 0). Clamp before the texture modulate.
+        // Match the engine lighting, ambient + directColor * dot(N, L) with L un-normalized, plus
+        // each point light's (rangeSq - distSq)/rangeSq * max(dot(N, toLight), 0). Clamp before the
+        // texture modulate.
         vec3 t_Normal = normalize(v_Normal);
         float t_Diffuse = max(dot(t_Normal, u_LightDir.xyz), 0.0);
         t_Light = u_AmbientColor.rgb + u_LightColor.rgb * t_Diffuse;
@@ -187,7 +187,7 @@ out float v_Altitude;
 
 void main() {
     // Peg depth to the far plane so the dome is never clipped. The sky pass disables depth
-    // testing, so geometry always draws in front of it.
+    // testing and draws first.
     gl_Position = (UnpackMatrix(u_ClipFromModel) * vec4(a_Position, 1.0)).xyww;
     v_Color = a_Color;
     v_TexCoord = a_TexCoord;
@@ -206,9 +206,9 @@ void main() {
     vec3 t_Color = v_Color;
     if (u_SkyParams.x > 0.5) {
         float t_Cloud = texture(SAMPLER_2D(u_CloudTexture), v_TexCoord).r;
-        // Clouds live overhead and fade out toward the horizon, where the planar projection would
-        // otherwise streak. Dense texels mix toward a lighter tint of the sky's own hue, so they
-        // read as translucent billows rather than a foreign colour.
+        // Clouds sit overhead and fade out toward the horizon, where the planar projection would
+        // otherwise streak. Dense texels mix toward a lighter tint of the sky hue and read as
+        // translucent billows.
         float t_Fade = clamp(v_Altitude * 1.8, 0.0, 1.0);
         vec3 t_CloudColor = min(v_Color * 1.4 + vec3(0.25, 0.18, 0.12), vec3(1.0));
         t_Color = mix(t_Color, t_CloudColor, t_Cloud * t_Fade * u_SkyParams.y);
@@ -249,8 +249,8 @@ function buildSkyDomeMesh(gradient: number[][]): { vertices: Float32Array; indic
         const phi = Math.PI * (0.5 - la / SKY_DOME_LAT);
         const domeY = Math.sin(phi), ringRadius = Math.cos(phi);
         // The dome reads vertically flipped against the Y-negated scene. Mapping the visible upper
-        // hemisphere onto warm bands 0..3 and the hidden lower one onto 3..7 keeps the gradient's
-        // blue middle bands below the horizon instead of letting them dominate the sky.
+        // hemisphere onto warm bands 0..3 and the hidden lower one onto 3..7 places the blue middle
+        // bands of the gradient below the horizon.
         const visibleAltitude = -domeY;
         const gradientT = visibleAltitude >= 0
             ? (1 - visibleAltitude) * (3 / 7)
@@ -339,7 +339,7 @@ void main() {
     mat4 t_ClipFromWorld = UnpackMatrix(u_ClipFromWorld);
     vec3 t_World = u_Center.xyz + (a_Position.x * u_Right.xyz + a_Position.y * u_Up.xyz) * u_Center.w;
     vec4 t_Corner = t_ClipFromWorld * vec4(t_World, 1.0);
-    // Take depth from the centre, not the corner, so the sprite occludes all-or-nothing.
+    // Take depth from the centre, not the corner. The sprite then occludes all-or-nothing.
     vec4 t_Center = t_ClipFromWorld * vec4(u_Center.xyz, 1.0);
     gl_Position = vec4(t_Corner.xy, (t_Center.z / t_Center.w) * t_Corner.w, t_Corner.w);
     v_TexCoord = u_UVRect.xy + a_TexCoord * u_UVRect.zw;
@@ -421,7 +421,7 @@ export class IncomingMeshData {
     public readonly indexBufferDescriptor: GfxIndexBufferDescriptor;
     /** Number of triangle indices to draw. */
     public readonly indexCount: number;
-    /** Length of the leading run of indices whose faces are single-sided, so safe to cull. */
+    /** Length of the leading run of indices whose faces are single-sided and safe to cull. */
     public readonly singleSidedIndexCount: number;
     /**
      * Bounding radius in the XZ plane, in model units. Scaled by the part scale, this gives the
@@ -458,7 +458,7 @@ export class IncomingMeshData {
     }
 
     /**
-     * Releases the GPU buffers this mesh owns.
+     * Releases the GPU buffers of this mesh.
      *
      * @param device The GPU device.
      */
@@ -490,7 +490,7 @@ export interface IncomingInstance {
     readonly selfIllum: boolean;
     /** Alpha-test out the texture's near-black texels. */
     readonly colorKey: boolean;
-    /** `semi transparent`: alpha-blended at {@link SHIELD_OPACITY} and drawn after the opaques. */
+    /** `semi transparent`, alpha-blended at {@link SHIELD_OPACITY} and drawn after the opaques. */
     readonly transparent?: boolean;
     /** Disable backface culling. */
     readonly twoSided: boolean;
@@ -506,7 +506,7 @@ export interface IncomingInstance {
     readonly spin?: [number, number, number];
     /** Pulse the part's local-Z scale each frame, for `operate "spinengines"`. */
     readonly flameFlicker?: boolean;
-    /** The placement and hierarchy transform without mesh scale, which spin animates from. */
+    /** The placement and hierarchy transform without mesh scale, the base for spin animation. */
     readonly baseFrame?: mat4;
     /** Target world frame for an `animate` keyframe part. */
     readonly animTargetFrame?: mat4;
@@ -520,14 +520,14 @@ export interface IncomingInstance {
     readonly animFrames?: readonly IncomingAnimFrame[];
     /**
      * Waypoint-path mover, for aircraft and ships following an MDL route. When set,
-     * {@link baseFrame} and {@link modelMatrix} are actor-local, and the renderer prepends the
-     * mover's world root transform each frame so the whole actor travels.
+     * {@link baseFrame} and {@link modelMatrix} are relative to the object, and the renderer
+     * prepends the world root transform of the mover each frame to move the whole object.
      */
     readonly mover?: IncomingMover;
 }
 
 /**
- * A moving actor's traversal state: a closed world-space polyline walked at constant speed. Both
+ * Traversal state of a moving object, a closed world-space polyline walked at constant speed. Both
  * `patrol` circuits and one-shot `goto` transits loop forever.
  */
 export interface IncomingMover {
@@ -542,11 +542,11 @@ export interface IncomingMover {
     /** Up vector for orientation, in Incoming space. */
     readonly up: readonly [number, number, number];
     /**
-     * Forward vector from the actor's placement. Falls back to this heading when the path direction
+     * Forward vector from the object placement. Falls back to this heading when the path direction
      * runs parallel to {@link up}.
      */
     readonly forward: readonly [number, number, number];
-    /** Offset along the loop, 0..1, so actors spawned together do not move in lockstep. */
+    /** Offset along the loop, 0..1, to stop objects spawned together moving in lockstep. */
     readonly phase: number;
 }
 
@@ -581,9 +581,8 @@ function computeMoverMatrix(mover: IncomingMover, time: number): mat4 {
     vec3.normalize(scratchMoverFwd, scratchMoverFwd);
     vec3.set(scratchMoverUp, mover.up[0], mover.up[1], mover.up[2]);
     vec3.normalize(scratchMoverUp, scratchMoverUp);
-    // When the path runs parallel to up, as in a rocket launch, the cross product collapses and
-    // leaves no valid heading, so keep the authored forward instead of tipping the actor onto
-    // an arbitrary axis.
+    // When the path runs parallel to up, as in a rocket launch, the cross product collapses to
+    // zero. Use the authored forward instead of tipping the object onto an arbitrary axis.
     vec3.cross(scratchMoverRight, scratchMoverUp, scratchMoverFwd);
     if (vec3.len(scratchMoverRight) < MIN_CROSS_LENGTH) {
         vec3.set(scratchMoverFwd, mover.forward[0], mover.forward[1], mover.forward[2]);
@@ -613,8 +612,8 @@ export interface IncomingAnimFrame {
 }
 
 /**
- * A billboard from a placed part's `sprite`: a nav light, engine glow or smoke emitter. Drawn
- * additively at real scene depth.
+ * A billboard from the `sprite` of a placed part (a nav light, engine glow or smoke emitter).
+ * Drawn additively at real scene depth.
  */
 export interface IncomingSpriteInstance {
     /** Billboard center in Incoming world space. */
@@ -629,17 +628,17 @@ export interface IncomingSpriteInstance {
     readonly color: [number, number, number];
     /** Cycle keyframes, RGB 0..255. Empty for a static sprite. */
     readonly cycleColors: readonly (readonly [number, number, number])[];
-    /** Engine frames each cycle key is held, from `colourfade speed`. Zero means static. */
+    /** Engine frames per cycle key, from `colourfade speed`. Zero means static. */
     readonly cycleSpeed: number;
 }
 
 /**
  * A smoke-plume emitter from a placed object's `smoke` directive, used for cooling towers, chimneys
- * and exhaust. The renderer reproduces the engine's steady-state column: a puff spawns every
+ * and exhaust. The renderer reproduces the steady-state column of the engine. A puff spawns every
  * {@link rate} frames at {@link position}, then rises and expands over its {@link lifetime}.
  */
 export interface IncomingSmokeInstance {
-    /** Emitter position in Incoming space: the part origin plus its rotated local offset. */
+    /** Emitter position in Incoming space, the part origin plus its rotated local offset. */
     readonly position: [number, number, number];
     /** Starting puff size in world units. Each puff grows 5 units per frame from here. */
     readonly size: number;
@@ -647,7 +646,7 @@ export interface IncomingSmokeInstance {
     readonly color: [number, number, number];
     /** Peak puff opacity 0..255, used on the alpha-blended path. */
     readonly alpha: number;
-    /** Frames between puff spawns. With {@link lifetime} this sets how many are alive at once. */
+    /** Frames between puff spawns. With {@link lifetime} this sets the concurrent puff count. */
     readonly rate: number;
     /** Puff lifetime in game frames, making the column `lifetime * 16` units tall. */
     readonly lifetime: number;
@@ -671,7 +670,7 @@ export interface IncomingShadowInstance {
 export interface IncomingPointLight {
     /** Position in Incoming space, pre-conversion. */
     readonly position: [number, number, number];
-    /** RGB, already divided by 255. May exceed 1.0, since lights are summed and then clamped. */
+    /** RGB, already divided by 255. May exceed 1.0. Lights are summed and then clamped. */
     readonly color: [number, number, number];
     /** Radius in world units. */
     readonly radius: number;
@@ -723,9 +722,9 @@ export class IncomingRenderer implements SceneGfx {
     public skyCloudTexture?: GfxTexture;
     /** Sun sprite texture, set by the scene loader after construction. */
     public sunTexture?: GfxTexture;
-    /** Terrain and model meshes owned by this scene, destroyed on teardown. */
+    /** Terrain and model meshes created by this scene, destroyed on teardown. */
     public meshes: IncomingMeshData[] = [];
-    /** Textures owned by this scene, destroyed on teardown. */
+    /** Textures created by this scene, destroyed on teardown. */
     public textures: GfxTexture[] = [];
     /** Every drawable instance. */
     public instances: IncomingInstance[] = [];
@@ -778,7 +777,7 @@ export class IncomingRenderer implements SceneGfx {
         this.skyProgram = cache.createProgram(new IncomingSkyProgram());
         const dome = buildSkyDomeMesh(sceneParams.skyGradient);
         this.skyMesh = new IncomingMeshData(device, dome.vertices, dome.indices);
-        // A unit quad whose corner offsets live in a_Position.xy, billboarded in the shader.
+        // A unit quad whose corner offsets are in a_Position.xy, billboarded in the shader.
         this.sunProgram = cache.createProgram(new IncomingSunProgram());
         this.spriteProgram = cache.createProgram(new IncomingSpriteProgram());
         // A unit quad in the local XZ plane, scaled and oriented per object.
@@ -827,7 +826,7 @@ export class IncomingRenderer implements SceneGfx {
         if (inst.mover === undefined) {
             return local;
         }
-        // `local` is actor-local here, so prepend the mover's world root to carry the whole craft.
+        // `local` is relative to the mover here. Prepend the mover world root to move the craft.
         const root = computeMoverMatrix(inst.mover, viewerInput.time);
         return mat4.multiply(scratchModelMatrix, root, local);
     }
@@ -836,9 +835,9 @@ export class IncomingRenderer implements SceneGfx {
         if (inst.baseFrame === undefined || inst.meshScale === undefined) {
             return inst.modelMatrix;
         }
-        // Hold the part at its target pose rather than oscillating: the placed aircraft are
-        // airborne, so landing gear stays retracted. Base and target differ only in translation in
-        // this data, so the target translation rides on the base orientation.
+        // Fix the part at its target pose rather than oscillating. The placed aircraft are
+        // airborne, with landing gear retracted. Base and target differ only in translation in the
+        // data, and the target translation is applied on the base orientation.
         if (inst.animTargetFrame !== undefined) {
             mat4.copy(scratchLocalMatrix, inst.baseFrame);
             scratchLocalMatrix[12] = inst.animTargetFrame[12];
@@ -857,7 +856,7 @@ export class IncomingRenderer implements SceneGfx {
         }
 
         mat4.copy(scratchLocalMatrix, inst.baseFrame);
-        // The frame already places and orients the part, so rotate about its own local axes.
+        // The frame already places and orients the part. Rotate about the local axes of the part.
         if (spin !== undefined && hasSpin) {
             const ticks = viewerInput.time * SPIN_TICKS_PER_MS;
             if (spin[0] !== 0) {
@@ -1009,7 +1008,7 @@ export class IncomingRenderer implements SceneGfx {
         const msPerFrame = (1000 / SMOKE_GAME_FPS) / ANIMATION_SPEED;
 
         for (const emitter of this.smoke) {
-            // The engine keeps this many puffs alive at once. Match it, evenly phased.
+            // The engine has this many puffs at once. Match the count, evenly phased.
             const puffCount = Math.min(SMOKE_MAX_PUFFS, Math.max(1, Math.ceil(emitter.lifetime / emitter.rate)));
             const puffLifeMs = emitter.lifetime * msPerFrame;
             const mega: Partial<GfxMegaStateDescriptor> = { cullMode: GfxCullMode.None, depthWrite: false, depthCompare: reverseDepthForCompareMode(GfxCompareMode.LessEqual) };
@@ -1022,13 +1021,13 @@ export class IncomingRenderer implements SceneGfx {
                 const ageFrames = puffPhase * emitter.lifetime;
                 const riseY = ageFrames * SMOKE_RISE_PER_FRAME;
                 const driftX = ageFrames * SMOKE_DRIFT_PER_FRAME;
-                // Incoming up is -Y, so rising subtracts.
+                // Incoming up is -Y. Rising subtracts.
                 scratchBillboardCenter[0] = SCENE_SCALE * (emitter.position[0] + driftX);
                 scratchBillboardCenter[1] = -SCENE_SCALE * (emitter.position[1] - riseY);
                 scratchBillboardCenter[2] = -SCENE_SCALE * emitter.position[2];
                 const size = (emitter.size + ageFrames * SMOKE_GROW_PER_FRAME) * SCENE_SCALE;
-                // The engine cycles each puff through dissipating frames. Fade instead, so a puff
-                // thins as it rises rather than popping.
+                // The engine cycles each puff through dissipating frames. Fade instead, thinning
+                // each puff as it rises rather than popping.
                 const alpha = (emitter.alpha / 255) * (1 - puffPhase);
 
                 const renderInst = renderInstManager.newRenderInst();
@@ -1060,14 +1059,14 @@ export class IncomingRenderer implements SceneGfx {
         template.setBindingLayouts([{ numSamplers: 1, numUniformBuffers: 1 }]);
         template.setGfxProgram(this.shadowProgram);
 
-        // Shadow quads live in Incoming space like the geometry, so share its clip matrix.
+        // Shadow quads are in Incoming space like the geometry and share its clip matrix.
         const clipFromWorld = mat4.mul(scratchClipFromWorld, viewerInput.camera.clipFromWorldMatrix, noclipSpaceFromIncomingSpace);
 
         for (const shadow of this.shadows) {
             const renderInst = renderInstManager.newRenderInst();
             renderInst.setVertexInput(this.inputLayout, this.shadowMesh.vertexBufferDescriptors, this.shadowMesh.indexBufferDescriptor);
             renderInst.setDrawCount(this.shadowMesh.indexCount);
-            // The colour is black, so texture coverage darkens the ground.
+            // The colour is black. Texture coverage darkens the ground.
             const mega: Partial<GfxMegaStateDescriptor> = { cullMode: GfxCullMode.None, depthWrite: false, depthCompare: reverseDepthForCompareMode(GfxCompareMode.LessEqual) };
             setAttachmentStateSimple(mega, { blendMode: GfxBlendMode.Add, blendSrcFactor: GfxBlendFactor.SrcAlpha, blendDstFactor: GfxBlendFactor.OneMinusSrcAlpha });
             renderInst.setMegaStateFlags(mega);
@@ -1095,7 +1094,7 @@ export class IncomingRenderer implements SceneGfx {
 
         renderInstManager.setCurrentList(this.renderInstListMain);
 
-        // Sky first, with depth disabled, so all geometry draws in front of it.
+        // Sky first, with depth disabled.
         this.drawSky(renderInstManager, viewerInput);
         this.drawSun(renderInstManager, viewerInput);
 
@@ -1149,7 +1148,7 @@ export class IncomingRenderer implements SceneGfx {
                 drawRange(singleSided, mesh.indexCount - singleSided, GfxCullMode.None);
             }
         };
-        // Opaques first, so the semi-transparent pass blends over finished geometry.
+        // Opaques first. The semi-transparent pass blends over finished geometry.
         for (const inst of this.instances) {
             if (inst.transparent !== true) {
                 drawInstance(inst);
@@ -1190,7 +1189,7 @@ export class IncomingRenderer implements SceneGfx {
     }
 
     /**
-     * Releases every GPU resource this scene owns.
+     * Releases every GPU resource of this scene.
      *
      * @param device The GPU device.
      */

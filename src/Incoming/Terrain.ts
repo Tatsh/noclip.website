@@ -1,7 +1,7 @@
 
-// Terrain for Incoming (1998, Rage Software). `tland1.bin` holds a 513x513 grid of int16 heights
+// Terrain for Incoming (1998, Rage Software). `tland1.bin` is a 513x513 grid of int16 heights
 // over a 512x512 cell field at 700 world units per cell, the height being the raw int16.
-// `city2tc.bin` holds a 128x128 map of int16 tile words, one per 4x4-cell tile.
+// `city2tc.bin` is a 128x128 map of int16 tile words, one per 4x4-cell tile.
 
 import { vec2, vec3 } from "gl-matrix";
 import ArrayBufferSlice from "../ArrayBufferSlice.js";
@@ -94,7 +94,7 @@ export function sampleGroundHeight(hf: Heightfield, worldX: number, worldZ: numb
     const heightAtPosX = heightAt(hf, ix + 1, iz);
     const heightAtPosZ = heightAt(hf, ix, iz + 1);
     const heightAtFar = heightAt(hf, ix + 1, iz + 1);
-    // The cell's two triangles meet along the posX-to-posZ edge, which both interpolations share.
+    // The two triangles of the cell meet along the posX-to-posZ edge shared by both interpolations.
     const inOriginTriangle = tx + tz <= 1.0;
     if (inOriginTriangle) {
         return heightAtOrigin + (heightAtPosX - heightAtOrigin) * tx + (heightAtPosZ - heightAtOrigin) * tz;
@@ -135,8 +135,8 @@ function orientUV(u: number, v: number, quarterTurns: number, flipU: boolean, fl
  *
  * @param hf The parsed heightfield.
  * @param cellFlags Raw `city2tc.bin`, 128*128 little-endian int16.
- * @returns One mesh per land-texture index that has at least one tile, so fewer than
- * {@link TERRAIN_MAX_TEXTURES} of them.
+ * @returns One mesh per land-texture index with at least one tile, at most
+ * {@link TERRAIN_MAX_TEXTURES}.
  */
 export function buildTerrainMeshes(hf: Heightfield, cellFlags: ArrayBufferSlice): TerrainMesh[] {
     const tiles = cellFlags.createTypedArray(Int16Array, 0, TERRAIN_TILE_GRID * TERRAIN_TILE_GRID);
