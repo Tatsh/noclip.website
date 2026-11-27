@@ -104,6 +104,7 @@ import * as Scenes_CrashWarped from './CrashWarped/scenes.js';
 import * as Scenes_PlusForXP from './PlusForXP/scenes.js';
 import * as Scenes_MarioKart64 from './MarioKart64/scenes.js';
 import * as Scenes_TopGearRally from './TopGearRally/scenes.js';
+import * as Scenes_Monopoly2008 from './Monopoly2008/scenes.js';
 import * as Scenes_KirbyAirRide from './KirbyAirRide/scenes.js';
 import * as Scenes_Descent1 from './Descent1_2/Scenes_Descent1.js';
 import * as Scenes_Descent2 from './Descent1_2/Scenes_Descent2.js';
@@ -281,6 +282,7 @@ const sceneGroups: (string | SceneGroup)[] = [
     Scenes_TokyoMirageSessionsSharpFE.sceneGroup,
     Scenes_TopGearRally.sceneGroup,
     Scenes_KingdomHeartsBBS.sceneGroup,
+    Scenes_Monopoly2008.sceneGroup,
 ];
 
 enum SaveStatesAction {
